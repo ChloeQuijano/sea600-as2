@@ -1,0 +1,10 @@
+api_config.py
+multilingual_bert/
+models_saved/
+full_data/
+.ipynb_checkpoints/
+*.zip
+hate_speech_mlma/
+*.tar
+only_hate/
+venv/
