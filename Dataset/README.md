@@ -6,10 +6,10 @@ The datasets used are as follows:
 2. English:
 	2a. [Davidson et al.](https://github.com/t-davidson/hate-speech-and-offensive-language)
 	2b. [Gilbert et al.](https://github.com/aitor-garcia-p/hate-speech-dataset)
-	2c. [Waseem et al.](https://github.com/zeerakw/hatespeech)
-	2d. [Basile et al.](https://github.com/msang/hateval)
+	2c. [Waseem et al.](https://github.com/zeerakw/hatespeech) (Need Twitter API)
+	2d. [Basile et al.](https://github.com/msang/hateval) (Need permission)
 	2e. [Ousidhoum et al.](https://github.com/HKUST-KnowComp/MLMA_hate_speech)
-	2f. [Founta et al.](https://github.com/ENCASEH2020/hatespeech-twitter)
+	2f. [Founta et al.](https://github.com/ENCASEH2020/hatespeech-twitter) (Need Twitter API)
 3. German:
 	3a. [Ross et al.](https://github.com/UCSM-DUE/IWG_hatespeech_public)
 	3b. [Bretschneider et al.](http://www.ub-web.de/research/)
@@ -17,15 +17,15 @@ The datasets used are as follows:
 	4a. [Ibrohim et al.](https://github.com/okkyibrohim/id-multi-label-hate-speech-and-abusive-language-detection)
 	4b. [Alfina et al.](https://github.com/ialfina/id-hatespeech-detection)
 5. Italian: 
-	5a. [Sanguinetti et al.](https://github.com/msang/hate-speech-corpus)
-	5b. [Bosco et al.](https://github.com/msang/haspeede2018)
+	5a. [Sanguinetti et al.](https://github.com/msang/hate-speech-corpus) (Need Twitter API)
+	5b. [Bosco et al.](https://github.com/msang/haspeede2018) (Need permission)
 6. Polish: 
-	6a. [Ptaszynski et al.](http://poleval.pl/tasks/task6)
+	6a. [Ptaszynski et al.](http://poleval.pl/tasks/task6) (Need login)
 7. Portugese:
 	7a. [Fortuna et al.](https://github.com/paulafortuna/Portuguese-Hate-Speech-Dataset)
 8. Spanish:
-	8a. [Basile et al.](https://github.com/msang/hateval)
-	8b. [Pereira et al.](https://zenodo.org/record/2592149)
+	8a. [Basile et al.](https://github.com/msang/hateval) (Need permission)
+	8b. [Pereira et al.](https://zenodo.org/record/2592149) (Need Twitter API)
 9. French:
 	9a. [Ousidhoum et al.](https://github.com/HKUST-KnowComp/MLMA_hate_speech)
 

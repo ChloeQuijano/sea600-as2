@@ -1,6 +1,6 @@
 import torch
 import transformers
-from keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler
 import numpy as np
 batch_size = 8
@@ -23,6 +23,7 @@ def custom_tokenize(sentences,tokenizer,max_length=512):
                                 sent,                      # Sentence to encode.
                                 add_special_tokens = True, # Add '[CLS]' and '[SEP]'
                                 max_length = max_length,
+                                truncation=True         # Truncate all sentences.
                                 # This function also supports truncation and conversion
                                 # to pytorch tensors, but we need to do padding, so we
                                 # can't use these features :( .
@@ -37,6 +38,7 @@ def custom_tokenize(sentences,tokenizer,max_length=512):
                                 ' ',                      # Sentence to encode.
                                 add_special_tokens = True, # Add '[CLS]' and '[SEP]'
                                 max_length = max_length,
+                                truncation=True         # Truncate all sentences.
                                 # This function also supports truncation and conversion
                                 # to pytorch tensors, but we need to do padding, so we
                                 # can't use these features :( .

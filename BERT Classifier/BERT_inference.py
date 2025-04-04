@@ -3,7 +3,7 @@ import transformers
 import torch
 import neptune
 
-from api_config import project_name,proxies,api_token
+from dotenv import load_dotenv
 import glob 
 from transformers import get_linear_schedule_with_warmup
 from transformers import BertTokenizer
@@ -18,22 +18,25 @@ from sklearn.metrics import accuracy_score,f1_score
 from tqdm import tqdm
 import os
 
+load_dotenv()  # take environment variables
+
 # If gpu is available
-if torch.cuda.is_available():    
-    # Tell PyTorch to use the GPU.    
+if torch.cuda.is_available():
     device = torch.device("cuda")
-    print('There are %d GPU(s) available.' % torch.cuda.device_count())
-    print('We will use the GPU:', torch.cuda.get_device_name(0))
-# If not...
+    print(f"There are {torch.cuda.device_count()} GPU(s) available.")
+    print(f"We will use the GPU: {torch.cuda.get_device_name(torch.cuda.current_device())}")
 else:
-    print('No GPU available, using the CPU instead.')
     device = torch.device("cpu")
+    print("No GPU available, using the CPU instead.")
+
 
 
 # Initialize neptune for logging
-neptune.init(project_name,api_token=api_token,proxies=proxies)
-neptune.set_project(project_name)
-
+run = neptune.init_run(
+    project=os.getenv("PROJECT_NAME"),
+    api_token=os.getenv("NEPTUNE_API_TOKEN"),
+    proxies=os.getenv("PROXY")
+)
 
 # The function for evaluating
 # Params - see below for description
@@ -42,10 +45,11 @@ neptune.set_project(project_name)
 def Eval_phase(params,which_files='test',model=None):
 
 	# For english, there is no translation, hence use full dataset.
-	if(params['language']=='English'):
-		params['csv_file']='*_full.csv'
+	#if(params['language']=='English'):
+	params['csv_file']='*_full.csv'
 	
 	# Load the files to test on
+	"""
 	if(which_files=='train'):
 		path=params['files']+'/train/'+params['csv_file']
 		test_files=glob.glob(path)
@@ -55,6 +59,9 @@ def Eval_phase(params,which_files='test',model=None):
 	if(which_files=='test'):
 		path=params['files']+'/test/'+params['csv_file']
 		test_files=glob.glob(path)
+	"""
+	path = os.path.join(params['files'], which_files, params['language'], params['csv_file'])
+	test_files = glob.glob(path)
 	
 	'''Testing phase of the model'''
 	print('Loading BERT tokenizer...')
@@ -69,7 +76,8 @@ def Eval_phase(params,which_files='test',model=None):
 		model.eval()
 	else:
 		model=select_model(params['what_bert'],params['path_files'],params['weights'])
-		model.cuda()
+		#model.cuda()
+		model.to(device)
 		model.eval()
 
 	# Load the dataset
@@ -137,8 +145,8 @@ def Eval_phase(params,which_files='test',model=None):
 		neptune.append_tag(bert_model)
 		neptune.append_tag(language)
 		neptune.append_tag('test')
-		neptune.log_metric('test_f1score',testf1)
-		neptune.log_metric('test_accuracy',testacc)
+		run['test_f1score'] = testf1
+		run['test_accuracy'] = testacc
 		neptune.stop()
 	
 	return testf1,testacc

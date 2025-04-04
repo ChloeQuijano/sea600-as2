@@ -4,9 +4,10 @@ knockknock==0.1.7
 transformers==2.1.1
 Keras==2.2.4
 neptune_client==0.4.95
-torch==1.7.1
+torch==1.11.0
 tqdm==4.32.1
 pandas==0.24.2
 GPUtil==1.4.0
 gtrans==0.2
 scikit_learn==0.22.1
+python-dotenv==0.21.1

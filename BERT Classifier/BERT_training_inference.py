@@ -3,59 +3,68 @@
 import transformers 
 import torch
 import neptune
-from api_config import project_name,proxies,api_token
+from dotenv import load_dotenv
 import glob 
 from transformers import get_linear_schedule_with_warmup
 from transformers import BertTokenizer
-from transformers import BertForSequenceClassification, AdamW, BertConfig
+from transformers import BertForSequenceClassification, BertConfig
+from transformers import AdamW
 import random
 from transformers import BertTokenizer
 from bert_codes.feature_generation import combine_features,return_dataloader
 from bert_codes.data_extractor import data_collector
-from bert_codes.own_bert_models import *
+from transformers.models.bert.modeling_bert import *
 from bert_codes.utils import *
 from sklearn.metrics import accuracy_score,f1_score
 from tqdm import tqdm
 from BERT_inference import *
+from pathlib import Path
 import os
 
+load_dotenv()  # take environment variables
 
 # If there's a GPU available...
-if torch.cuda.is_available():    
-    # Tell PyTorch to use the GPU.    
+if torch.cuda.is_available():
     device = torch.device("cuda")
-    print('There are %d GPU(s) available.' % torch.cuda.device_count())
-    print('We will use the GPU:', torch.cuda.get_device_name(0))
-# If not...
+    print(f"There are {torch.cuda.device_count()} GPU(s) available.")
+    print(f"We will use the GPU: {torch.cuda.get_device_name(torch.cuda.current_device())}")
 else:
-    print('No GPU available, using the CPU instead.')
     device = torch.device("cpu")
+    print("No GPU available, using the CPU instead.")
+
 
 # Set the gpu device 
-print("current gpu device", torch.cuda.current_device())
-torch.cuda.set_device(0)
-print("current gpu device",torch.cuda.current_device())
+#print("current gpu device", torch.cuda.current_device())
+#torch.cuda.set_device(0)
+#print("current gpu device",torch.cuda.current_device())
 
 
 # Initialize neptune for logging the parameters and metrics
-neptune.init(project_name,api_token=api_token,proxies=proxies)
-neptune.set_project(project_name)
+run = neptune.init_run(
+    project=os.getenv("PROJECT_NAME"),
+    api_token=os.getenv("NEPTUNE_API_TOKEN"),
+    proxies=os.getenv("PROXY")
+)
   
 # The main function that does the training
 
 def train_model(params,best_val_fscore):
 	
 	# In case of english languages, translation is the origin data itself.
-	if(params['language']=='English'):
-		params['csv_file']='*_full.csv'
-	
+	#if(params['language']=='English'):
+	lang = params['language']
+	params['csv_file'] = f"{lang}_*_full.csv"
 
-	train_path=params['files']+'/train/'+params['csv_file']
-	val_path=params['files']+'/val/'+params['csv_file']
+	train_path = Path(params['files']) / 'train' / lang / params['csv_file']
+	val_path = Path(params['files']) / 'val' / lang / params['csv_file']
 
-	# Load the training and validation datasets
-	train_files=glob.glob(train_path)
-	val_files=glob.glob(val_path)
+	train_files = glob.glob(str(train_path))
+	val_files = glob.glob(str(val_path))
+
+	print(f"Train path: {train_path}")
+	print(f"Val path: {val_path}")
+	print(f"Train files found: {train_files}")
+	print(f"Validation files found: {val_files}")
 	
 	#Load the bert tokenizer
 	print('Loading BERT tokenizer...')
@@ -64,15 +73,35 @@ def train_model(params,best_val_fscore):
 	df_val=data_collector(val_files,params,False)
 	
 	# Get the comment texts and corresponding labels
+	"""
 	if(params['csv_file']=='*_full.csv'):
 		sentences_train = df_train.text.values
 		sentences_val = df_val.text.values
 	elif(params['csv_file']=='*_translated.csv'):
 		sentences_train = df_train.translated.values
 		sentences_val = df_val.translated.values
+    """
+	if df_train.columns.__contains__('text'):
+		sentences_train = df_train.text.values
+		sentences_val = df_val.text.values
+	elif df_train.columns.__contains__('translated'):
+		sentences_train = df_train.translated.values
+		sentences_val = df_val.translated.values
+	else:
+		raise ValueError("Expected 'text' or 'translated' column in the data.")
 	
+	#labels_train = df_train.label.values
+	#labels_val = df_val.label.values
+	# Convert string labels to numeric labels
+	label_mapping = {label: idx for idx, label in enumerate(df_train['label'].unique())}
+	print("Label mapping:", label_mapping)
+
+	df_train['label'] = df_train['label'].map(label_mapping)
+	df_val['label'] = df_val['label'].map(label_mapping)
+
 	labels_train = df_train.label.values
 	labels_val = df_val.label.values
+
 	label_counts=df_train['label'].value_counts()
 	print(label_counts)
 	label_weights = [ (len(df_train))/label_counts[0],len(df_train)/label_counts[1] ]
@@ -81,7 +110,8 @@ def train_model(params,best_val_fscore):
 	# Select the required bert model. Refer below for explanation of the parameter values.
 	model=select_model(params['what_bert'],params['path_files'],params['weights'])
 	# Tell pytorch to run this model on the GPU.
-	model.cuda()
+	#model.cuda()
+	model.to(device)
 
 	# Do the required encoding using the bert tokenizer
 	input_train_ids,att_masks_train=combine_features(sentences_train,tokenizer,params['max_length'])
@@ -115,10 +145,20 @@ def train_model(params,best_val_fscore):
 	bert_model = params['path_files']
 	language  = params['language']
 	name_one=bert_model+"_"+language
+	"""
 	if(params['logging']=='neptune'):
 		neptune.create_experiment(name_one,params=params,send_hardware_metrics=False,run_monitoring_thread=False)
 		neptune.append_tag(bert_model)
 		neptune.append_tag(language)
+	"""
+	if params['logging'] == 'neptune':
+		run = neptune.init_run(
+			project=os.getenv("PROJECT_NAME"),
+			api_token=os.getenv("NEPTUNE_API_TOKEN"),
+			proxies=os.getenv("PROXY")
+		)
+		run["params"] = params  # optional: logs all config settings
+		run["model_name"] = name_one
 		
 	# The best val fscore obtained till now, for the purpose of hyper parameter finetuning.
 	best_val_fscore=best_val_fscore
@@ -163,7 +203,7 @@ def train_model(params,best_val_fscore):
 			# loss value out of the tuple.
 			loss = outputs[0]
 			if(params['logging']=='neptune'):
-				neptune.log_metric('batch_loss',loss)
+				run["batch_loss"].log(loss)
 			# Accumulate the training loss over all of the batches so that we can
 			# calculate the average loss at the end. `loss` is a Tensor containing a
 			# single value; the `.item()` function just returns the Python value 
@@ -185,7 +225,7 @@ def train_model(params,best_val_fscore):
 		# Calculate the average loss over the training data.
 		avg_train_loss = total_loss / len(train_dataloader)
 		if(params['logging']=='neptune'):
-			neptune.log_metric('avg_train_loss',avg_train_loss)
+			run["avg_train_loss"].log(avg_train_loss)
 		
 
 		# Store the loss value for plotting the learning curve.
@@ -195,11 +235,11 @@ def train_model(params,best_val_fscore):
 		test_fscore,test_accuracy=Eval_phase(params,'test',model)
 
 		#Report the final accuracy and fscore for this validation run.
-		if(params['logging']=='neptune'):	
-			neptune.log_metric('val_fscore',val_fscore)
-			neptune.log_metric('val_acc',val_accuracy)
-			neptune.log_metric('test_fscore',test_fscore)
-			neptune.log_metric('test_accuracy',test_accuracy)
+		if(params['logging']=='neptune'):
+			run["val_f1score"].log(val_fscore)
+			run["val_accuracy"].log(val_accuracy)
+			run["test_f1score"].log(test_fscore)
+			run["test_accuracy"].log(test_accuracy)
 
 		# Save the model only if the validation fscore improves. After all epochs, the best model is the final saved one. 
 		if(val_fscore > best_val_fscore):
@@ -208,11 +248,16 @@ def train_model(params,best_val_fscore):
 
 			save_model(model,tokenizer,params) 		
 
-	if(params['logging']=='neptune'):
-		neptune.stop()	
+	if params['logging'] == 'neptune':
+		try:
+			run.stop()
+		except Exception as e:
+			print("Neptune stop error:", e)
 	del model
 	torch.cuda.empty_cache()
-	return fscore,best_val_fscore
+	# Define or calculate fscore before returning
+	fscore = val_fscore  # Assuming fscore is the validation fscore
+	return fscore, best_val_fscore
 
 
 
@@ -267,38 +312,35 @@ params={
 
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
+    lang_map = {
+        'Arabic': 'ar', 'French': 'fr', 'Portugese': 'pt', 'Spanish': 'es',
+        'English': 'en', 'Indonesian': 'id', 'Italian': 'it', 'German': 'de', 'Polish': 'pl'
+    }
 
-	lang_map={'Arabic':'ar','French':'fr','Portugese':'pt','Spanish':'es','English':'en','Indonesian':'id','Italian':'it','German':'de','Polish':'pl','Spanish':
-	'es','French':'fr'}
-	# torch.cuda.set_device(0)
+    lang_list = list(lang_map.keys())
 
-	lang_list=list(lang_map.keys())
-	for lang in lang_list[0:3]:
-		params['language']=lang
-		for sample_ratio,take_ratio in [(16,False),(32,False),(64,False),(128,False),(256,False)]:
-			count=0
-			params['take_ratio']=take_ratio
-			params['sample_ratio']=sample_ratio
-			best_val_fscore=0
-			for lr in [2e-5,3e-5,5e-5]:
-				params['learning_rate']=lr
-				for ss in ['stratified','equal']:
-					params['samp_strategy']=ss
-					for seed in [2018,2019,2020,2021,2022]:
-						params['random_seed']=seed
-						count+=1
-						_,best_val_fscore=train_model(params,best_val_fscore)
+    for lang in lang_list:
+        print(f"\n===== Starting training for {lang} =====\n")
+        params['language'] = lang
 
-
-		best_val_fscore=00
-		for lr in [2e-5,3e-5,5e-5]:
-			params['learning_rate']=lr
-			params['samp_strategy']='stratified'
-			for seed in [2018,2019,2020,2021,2022][:1]:
-				params['random_seed']=seed
-				_,best_val_fscore=train_model(params,best_val_fscore)
-		print('============================')
-		print('Model for Language',lang,'is trained')
-		print('============================')
+        # Skip this language if model directory already exists
+        if glob.glob(f"models_saved/multilingual_bert_{lang}_translated*"):
+            print(f"Model for {lang} already exists. Skipping training.")
+            continue
 		
+        for sample_ratio, take_ratio in [(16, False), (32, False), (64, False), (128, False), (256, False)]:
+            for lr in [2e-5, 3e-5, 5e-5]:
+                for ss in ['stratified', 'equal']:
+                    for seed in [2018, 2019, 2020, 2021, 2022]:
+                        params['take_ratio'] = take_ratio
+                        params['sample_ratio'] = sample_ratio
+                        params['learning_rate'] = lr
+                        params['samp_strategy'] = ss
+                        params['random_seed'] = seed
+                        best_val_fscore = 0
+                        _, best_val_fscore = train_model(params, best_val_fscore)
+
+        print(f'\n============================')
+        print(f'Model for Language {lang} is trained')
+        print('============================\n')
