@@ -177,4 +177,3 @@ if __name__=='__main__':
 	for lang in ['English','Polish','Portugese','German','Indonesian','Italian','Arabic']:
 			params['language']=lang
 			Eval_phase(params,'test')
-

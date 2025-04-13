@@ -10,3 +10,4 @@ venv/
 .env
 .neptune/
 __pycache__/
+.qodo
